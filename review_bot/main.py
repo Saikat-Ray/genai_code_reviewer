@@ -5,12 +5,17 @@ generate comments -> grade comments -> post accepted comments -> log everything.
 """
 
 import os
+import json
+
+import dotenv
 
 from review_bot import db, github_client, filtering, context, generate, grade
 
 GENERATOR_MODEL = "claude-sonnet-4-5"
 GRADER_MODEL = "o4-mini-high"
+from dotenv import load_dotenv
 
+load_dotenv()  # Load environment variables from .env file
 
 def main():
     print("review_bot.main: starting")
