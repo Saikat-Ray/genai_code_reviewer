@@ -1,2 +1,6 @@
-psycopg2-binary
-PyGithub
+psycopg2-binary>=2.9
+PyGithub>=2.3
+anthropic>=0.34
+openai>=1.40
+tree-sitter>=0.21
+tree-sitter-languages>=1.10

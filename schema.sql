@@ -34,7 +34,8 @@ CREATE TABLE IF NOT EXISTS comments (
     grader_reasoning        TEXT,
 
     status                  TEXT NOT NULL,  -- 'posted' | 'suppressed_confidence' | 'suppressed_severity' |
-                                             -- 'suppressed_hallucination' | 'suppressed_duplicate'
+                                             -- 'suppressed_hallucination' | 'suppressed_duplicate' |
+                                             -- 'suppressed_invalid_line' | 'post_failed'
     posted_at               TIMESTAMPTZ,
     github_comment_id       TEXT
 );
