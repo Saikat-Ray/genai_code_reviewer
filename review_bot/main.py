@@ -6,7 +6,7 @@ generate comments -> grade comments -> post accepted comments -> log everything.
 
 import os
 import json
-
+import sys
 import dotenv
 
 from review_bot import db, github_client, filtering, context, generate, grade
