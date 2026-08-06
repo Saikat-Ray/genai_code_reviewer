@@ -1,0 +1,38 @@
+name: AI Review Feedback (Replies)
+
+on:
+  pull_request_review_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  capture-reply-feedback:
+    # Only care about replies TO the bot's comments, not top-level review comments
+    # from humans reviewing each other, and not replies BY the bot itself.
+    if: >
+      github.event.comment.in_reply_to_id != null &&
+      github.event.comment.user.login != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Classify and store reply feedback
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PARENT_COMMENT_ID: ${{ github.event.comment.in_reply_to_id }}
+          REPLY_BODY: ${{ github.event.comment.body }}
+          REPLY_AUTHOR: ${{ github.event.comment.user.login }}
+        run: python -m review_bot.capture_reply_feedback
