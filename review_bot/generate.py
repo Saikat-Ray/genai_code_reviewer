@@ -4,9 +4,18 @@ LLM with the generation prompt, and returns structured candidate comments
 """
 
 import json
+import os
 from dataclasses import dataclass
 
 from review_bot import llm_client
+
+# Reasoning models (gpt-5, o-series) spend tokens on internal reasoning before
+# producing visible output. On files with large diffs/context, the default
+# 2048 can get entirely consumed by reasoning, leaving nothing for the actual
+# JSON — which then fails to parse and the file is silently skipped. 4096
+# leaves more headroom; override via env var if you still see empty responses
+# on particularly large files.
+GENERATOR_MAX_TOKENS = int(os.environ.get("GENERATOR_MAX_TOKENS", "4096"))
 
 
 @dataclass
@@ -122,9 +131,19 @@ def generate_comments(*, file_path: str, language: str, diff_hunk: str,
     )
 
     try:
-        raw_response = llm_client.call_model(model=model, system=GENERATION_SYSTEM_PROMPT, user_message=user_message)
+        raw_response = llm_client.call_model(
+            model=model, system=GENERATION_SYSTEM_PROMPT, user_message=user_message,
+            max_tokens=GENERATOR_MAX_TOKENS,
+        )
     except Exception as e:
-        print(f"generate_comments: LLM call failed for {file_path}: {e}")
+        print(f"generate_comments: LLM call failed for {file_path} (model={model}, "
+              f"max_tokens={GENERATOR_MAX_TOKENS}): {e}")
+        return []
+
+    if not raw_response or not raw_response.strip():
+        print(f"generate_comments: empty response from {model} for {file_path} — "
+              f"likely max_tokens={GENERATOR_MAX_TOKENS} was fully consumed by internal "
+              f"reasoning with nothing left for output. Try raising GENERATOR_MAX_TOKENS.")
         return []
 
     return _parse_response(raw_response, file_path=file_path)
