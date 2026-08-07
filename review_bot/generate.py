@@ -62,10 +62,15 @@ Return ONLY a JSON array. No prose before or after, no markdown code fences.
 
 
 def _build_user_message(*, file_path: str, language: str, diff_hunk: str,
-                         context: dict) -> str:
+                         context: dict, valid_lines: set[int] | None = None) -> str:
     """context: dict of {line_number: CodeContext}, as produced by main.py.
     Deduplicated so each unique enclosing-function block is shown once, even
     though multiple changed lines may point at the same CodeContext object.
+
+    valid_lines: the set of line numbers (in the new file) that are actually
+    part of the diff, per github_client.get_diff_lines(). Passed through so the
+    model is told up front which lines it's allowed to comment on, rather than
+    guessing and having invalid picks silently dropped after generation.
     """
     seen_ids = set()
     context_blocks = []
@@ -85,6 +90,15 @@ def _build_user_message(*, file_path: str, language: str, diff_hunk: str,
 
     context_section = "\n\n".join(context_blocks) if context_blocks else "(no context extracted)"
 
+    valid_lines_note = ""
+    if valid_lines:
+        sorted_lines = ", ".join(str(n) for n in sorted(valid_lines))
+        valid_lines_note = (
+            f"\n\nYou may only set \"line_number\" to one of these exact lines "
+            f"(the lines actually changed in this diff): {sorted_lines}\n"
+            f"Any comment on a line outside this set will be discarded, so don't propose one."
+        )
+
     return f"""File: {file_path}
 Language: {language}
 
@@ -92,16 +106,19 @@ Language: {language}
 
 --- Diff ---
 {diff_hunk}
+{valid_lines_note}
 """
 
 
 def generate_comments(*, file_path: str, language: str, diff_hunk: str,
-                       context: dict, model: str = "gpt-5") -> list[CandidateComment]:
+                       context: dict, model: str = "gpt-5",
+                       valid_lines: set[int] | None = None) -> list[CandidateComment]:
     if not diff_hunk.strip():
         return []
 
     user_message = _build_user_message(
-        file_path=file_path, language=language, diff_hunk=diff_hunk, context=context
+        file_path=file_path, language=language, diff_hunk=diff_hunk,
+        context=context, valid_lines=valid_lines
     )
 
     try:
