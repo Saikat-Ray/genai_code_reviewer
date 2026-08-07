@@ -4,4 +4,4 @@ anthropic>=0.34
 openai>=1.40
 tree-sitter>=0.21
 tree-sitter-languages>=1.10
-dotenv>=0.21
+
