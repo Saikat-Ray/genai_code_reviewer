@@ -5,12 +5,31 @@ than a rubber stamp. See conversation history for the full rationale.
 """
 
 import json
+import os
 from dataclasses import dataclass
 
 from review_bot import llm_client
 
-CORRECTNESS_CONFIDENCE_THRESHOLD = 4  # out of 5, start conservative
-SEVERITY_THRESHOLD = 3  # out of 5
+# Configurable via env vars so you can loosen these for a first test run without
+# touching code, then tighten back up once you've confirmed the pipeline works
+# end-to-end. Production default is strict (4/3) — see conversation history for
+# why precision matters more than volume here.
+CORRECTNESS_CONFIDENCE_THRESHOLD = int(os.environ.get("CORRECTNESS_CONFIDENCE_THRESHOLD", "4"))
+SEVERITY_THRESHOLD = int(os.environ.get("SEVERITY_THRESHOLD", "3"))
+
+# Reasoning models (o-series, gpt-5-mini) spend tokens on internal reasoning
+# before producing visible output. A small max_tokens budget can get entirely
+# consumed by reasoning, leaving zero tokens for the actual JSON response —
+# which then fails to parse and falls into the fail-closed path below, silently
+# suppressing everything. 300 was too tight for a reasoning-capable grader;
+# 1024 leaves real headroom. Override via env var if you need to tune further.
+GRADER_MAX_TOKENS = int(os.environ.get("GRADER_MAX_TOKENS", "1024"))
+
+# Testing escape hatch: when set, grading is skipped entirely and every candidate
+# is treated as approved. Use this to verify the rest of the pipeline (posting,
+# DB writes) works before trusting the grader itself. NEVER enable in production —
+# it defeats the entire precision-over-volume design this tool is built around.
+GRADE_BYPASS = os.environ.get("GRADE_BYPASS", "false").lower() == "true"
 
 GRADING_SYSTEM_PROMPT = """You are reviewing a code comment for accuracy before it's \
 shown to a developer. You did not write this comment — a different reviewer proposed \
@@ -65,6 +84,13 @@ class GradedComment:
 
 def grade_comment(*, code_context: str, comment_text: str, line_number: int,
                    category: str, model: str = "gpt-5-mini") -> GradedComment:
+    if GRADE_BYPASS:
+        print(f"grade_comment: GRADE_BYPASS enabled — skipping grading, auto-approving line {line_number}")
+        return GradedComment(
+            is_hallucinated=False, correctness_confidence=5, severity=5,
+            reasoning="GRADE_BYPASS enabled, grading skipped",
+        )
+
     user_message = f"""Code being reviewed (line {line_number} is the one in question):
 
 {code_context}
@@ -74,13 +100,17 @@ Proposed comment (category: {category}):
 
 Rate this comment."""
 
+    raw_response = None
     try:
         raw_response = llm_client.call_model(
-            model=model, system=GRADING_SYSTEM_PROMPT, user_message=user_message, max_tokens=300
+            model=model, system=GRADING_SYSTEM_PROMPT, user_message=user_message,
+            max_tokens=GRADER_MAX_TOKENS,
         )
         return _parse_grading_response(raw_response)
     except Exception as e:
         print(f"grade_comment: LLM call or parse failed, defaulting to suppress: {e}")
+        if raw_response is not None:
+            print(f"grade_comment: raw response was: {raw_response[:500]!r}")
         # Fail closed: if grading itself breaks, treat the comment as unverified
         # rather than letting it through unchecked.
         return GradedComment(
