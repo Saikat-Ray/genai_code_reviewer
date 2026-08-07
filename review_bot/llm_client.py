@@ -30,8 +30,9 @@ def _call_openai(*, model: str, system: str, user_message: str, max_tokens: int)
     client = OpenAI()  # reads OPENAI_API_KEY from env
     response = client.chat.completions.create(
         model=model,
+        max_completion_tokens=max_tokens,  # OpenAI deprecated max_tokens; this is current guidance
         messages=[
-            {"role": "system", "content": system},
+            {"role": "system", "content": system},  # auto-converted to 'developer' role for reasoning models
             {"role": "user", "content": user_message},
         ],
     )

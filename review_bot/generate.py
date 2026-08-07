@@ -96,7 +96,7 @@ Language: {language}
 
 
 def generate_comments(*, file_path: str, language: str, diff_hunk: str,
-                       context: dict, model: str = "claude-sonnet-4-5") -> list[CandidateComment]:
+                       context: dict, model: str = "gpt-5") -> list[CandidateComment]:
     if not diff_hunk.strip():
         return []
 

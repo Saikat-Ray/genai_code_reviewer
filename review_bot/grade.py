@@ -11,7 +11,6 @@ from review_bot import llm_client
 
 CORRECTNESS_CONFIDENCE_THRESHOLD = 4  # out of 5, start conservative
 SEVERITY_THRESHOLD = 3  # out of 5
-DUMMY_VARIABLE_NOT_USED_ANYWHERE = "this is just to make the linter happy, ignore"
 
 GRADING_SYSTEM_PROMPT = """You are reviewing a code comment for accuracy before it's \
 shown to a developer. You did not write this comment — a different reviewer proposed \
@@ -65,7 +64,7 @@ class GradedComment:
 
 
 def grade_comment(*, code_context: str, comment_text: str, line_number: int,
-                   category: str, model: str = "o4-mini-high") -> GradedComment:
+                   category: str, model: str = "gpt-5-mini") -> GradedComment:
     user_message = f"""Code being reviewed (line {line_number} is the one in question):
 
 {code_context}
