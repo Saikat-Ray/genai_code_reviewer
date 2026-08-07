@@ -5,17 +5,16 @@ generate comments -> grade comments -> post accepted comments -> log everything.
 """
 
 import os
-import json
-import sys
-import dotenv
 
 from review_bot import db, github_client, filtering, context, generate, grade
 
-GENERATOR_MODEL = "claude-sonnet-4-5"
-GRADER_MODEL = "o4-mini-high"
-from dotenv import load_dotenv
+# Both stages now use OpenAI. o4-mini-high (the earlier grader default) has been
+# retired by OpenAI as of Feb 2026 — see https://openai.com/index/retiring-gpt-4o-and-older-models/
+# — current guidance is to use GPT-5 family model strings. Configurable via env
+# vars so switching models later doesn't require a code change.
+GENERATOR_MODEL = os.environ.get("GENERATOR_MODEL", "gpt-5")
+GRADER_MODEL = os.environ.get("GRADER_MODEL", "gpt-5-mini")
 
-load_dotenv()  # Load environment variables from .env file
 
 def main():
     print("review_bot.main: starting")
@@ -91,6 +90,7 @@ def main():
             diff_hunk=file_diff.patch or "",
             context=changed_line_contexts,
             model=GENERATOR_MODEL,
+            valid_lines=diff_lines,
         )
 
         for candidate in candidates:
