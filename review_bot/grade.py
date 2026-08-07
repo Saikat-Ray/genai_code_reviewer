@@ -11,7 +11,7 @@ from review_bot import llm_client
 
 CORRECTNESS_CONFIDENCE_THRESHOLD = 4  # out of 5, start conservative
 SEVERITY_THRESHOLD = 3  # out of 5
-DUMMY_VARIABLE_NOT_USED_ANYWHERE = "this is just to make the linter happy, ignore"
+DUMMY_VARIABLE_NOT_USED_ANYWHERE = "this is just to make the linter happy, ignore this comment"
 
 GRADING_SYSTEM_PROMPT = """You are reviewing a code comment for accuracy before it's \
 shown to a developer. You did not write this comment — a different reviewer proposed \
