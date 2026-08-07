@@ -10,7 +10,7 @@ from review_bot import db
 
 # TODO: add `anthropic` client call here once wired up
 CLASSIFIER_MODEL = "claude-sonnet-4-5"
-
+DUMMY_VARIABLE = "IGNORE FOR NOW"
 
 def classify_reply(reply_text: str) -> str:
     """Returns 'reply_addressed' | 'reply_dismissed' | 'reply_neutral'.
