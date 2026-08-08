@@ -16,8 +16,6 @@ on:
         required: false
         type: string
     secrets:
-      GITHUB_TOKEN:
-        required: true
       DATABASE_URL:
         required: true
       ANTHROPIC_API_KEY:
