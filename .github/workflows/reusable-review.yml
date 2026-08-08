@@ -110,6 +110,12 @@ jobs:
       - name: Install dependencies
         if: steps.perm-check.outputs.allowed == 'true'
         run: pip install -r requirements.txt
+      
+      - name: Checkout reusable repository
+        uses: actions/checkout@v4
+        with:
+          repository: your-org/genai_code_reviewer
+          path: reviewer_repo
 
       - name: Run AI review pipeline
         if: steps.perm-check.outputs.allowed == 'true'
@@ -124,7 +130,7 @@ jobs:
           BASE_SHA: ${{ steps.pr.outputs.base_sha }}
           TRIGGERED_BY: ${{ steps.perm-check.outputs.commenter }}
           COMMAND: ${{ inputs.trigger_comment }}
-          PYTHONPATH: ${{ github.workspace }}
+          PYTHONPATH: ${{ github.workspace }}/reviewer_repo
         run: python -m review_bot.main
 
       - name: Post failure notice
