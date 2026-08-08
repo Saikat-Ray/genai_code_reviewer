@@ -9,15 +9,19 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from review_bot import db, github_client, filtering, context, generate, grade
+from review_bot import db, github_client, filtering, context, agents, grade
 
-# Both stages now use OpenAI. o4-mini-high (the earlier grader default) has been
-# retired by OpenAI as of Feb 2026 — see https://openai.com/index/retiring-gpt-4o-and-older-models/
-# — current guidance is to use GPT-5 family model strings. Configurable via env
-# vars so switching models later doesn't require a code change.
+# Generation is now multi-agent (see review_bot/agents/ — correctness + security
+# agents running in parallel via LangGraph, configurable via AGENT_NAMES env var
+# and the registry in agents/registry.py). Grading stays a single independent
+# pass. o4-mini-high (the earlier grader default) has been retired by OpenAI as
+# of Feb 2026 — see https://openai.com/index/retiring-gpt-4o-and-older-models/
+# — current guidance is to use GPT-5 family model strings.
 BASE_DIR = Path(__file__).resolve().parents[1]
 load_dotenv(BASE_DIR / ".env")
 
+# Fallback model for any agent that doesn't set its own `model` override in
+# its AgentConfig (see agents/config.py).
 GENERATOR_MODEL = os.environ.get("GENERATOR_MODEL", "gpt-5")
 GRADER_MODEL = os.environ.get("GRADER_MODEL", "gpt-5-mini")
 
@@ -47,7 +51,7 @@ def main():
         pr_number=pr_number,
         commit_sha=head_sha,
         triggered_by=triggered_by,
-        generator_model=GENERATOR_MODEL,
+        generator_model=agents.describe_registry(default_model=GENERATOR_MODEL),
         grader_model=GRADER_MODEL,
     )
     print(f"review_bot.main: created review_id={review_id}")
@@ -60,13 +64,6 @@ def main():
 
     print(f"review_bot.main: {len(files_to_review)} files to review, "
           f"{len(skips)} skipped")
-    if skips:
-        for file_path, reason in skips:
-            print(f"main:   skipped {file_path} ({reason})")
-    if not files_to_review:
-        print("main: WARNING — no files passed filtering, nothing will be reviewed. "
-              "Check the skip reasons above against review_bot/filtering.py's exclude "
-              "patterns and MAX_FILES_PER_REVIEW cap.")
 
     # Comments pending post, tagged with their (not-yet-assigned) DB row id so we
     # can map GitHub's response back after posting.
@@ -104,15 +101,15 @@ def main():
             extracted_ranges.append((ctx.start_line, ctx.end_line, ctx))
             changed_line_contexts[line] = ctx
 
-        candidates = generate.generate_comments(
+        candidates = agents.run_agents(
             file_path=file_diff.filename,
             language=language,
             diff_hunk=file_diff.patch or "",
             context=changed_line_contexts,
-            model=GENERATOR_MODEL,
             valid_lines=diff_lines,
+            model=GENERATOR_MODEL,
         )
-        print(f"main: {file_diff.filename} — generator returned {len(candidates)} candidate(s)")
+        print(f"main: {file_diff.filename} — {len(candidates)} candidate(s) after multi-agent generation + dedup")
 
         for candidate in candidates:
             if candidate.line_number not in diff_lines:
@@ -137,11 +134,6 @@ def main():
                 category=candidate.category,
                 model=GRADER_MODEL,
             )
-            print(f"main:   line {candidate.line_number} [{candidate.category}] "
-                  f"confidence={graded.correctness_confidence} severity={graded.severity} "
-                  f"hallucinated={graded.is_hallucinated} -> "
-                  f"{'POST' if graded.should_post else graded.suppression_reason} "
-                  f"({graded.reasoning})")
 
             if graded.should_post:
                 comment_id = db.insert_comment(

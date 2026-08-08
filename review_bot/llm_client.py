@@ -1,7 +1,15 @@
-"""Shared provider-agnostic LLM call dispatch, used by both generate.py and
-grade.py. Model name prefix decides which SDK handles the call, so callers
-just pass a model string without needing to know which provider it maps to.
+"""Shared provider-agnostic LLM call dispatch, used by grade.py (the
+independent grading pass) and, if still called anywhere, the legacy
+single-agent generate.py. Model name prefix decides which SDK handles the
+call, so callers just pass a model string without needing to know which
+provider it maps to.
+
+The multi-agent generation path (review_bot/agents/) uses its own LangChain
+chat model factory — see agents/llm.py — since it needs LangChain's
+invoke()-over-messages interface rather than raw SDK calls.
 """
+
+import os
 
 
 def call_model(*, model: str, system: str, user_message: str, max_tokens: int = 2048) -> str:

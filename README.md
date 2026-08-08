@@ -27,23 +27,40 @@ Full pipeline detail, prompts, and design rationale: see [`architecture.md`](./a
 
 ```
 your-repo/
-├── .github/workflows/
-│   ├── review.yml                 # /review comment trigger
-│   ├── feedback-replies.yml       # captures replies to bot comments
-│   └── feedback-reactions.yml     # polls 👍/👎 reactions every 4 hours
+├── .github/
+│   └── workflows/
+│       ├── review.yml                    # /review comment trigger
+│       ├── feedback-replies.yml          # reply feedback capture
+│       └── feedback-reactions.yml        # 👍/👎 reaction polling (every 4h)
+│
 ├── review_bot/
-│   ├── main.py                    # pipeline orchestrator
-│   ├── filtering.py                # file exclude/rank/cap logic
-│   ├── context.py                  # tree-sitter enclosing-function extraction
-│   ├── generate.py                 # comment generation prompt + call
-│   ├── grade.py                    # independent confidence-grading prompt + call
-│   ├── llm_client.py               # shared Claude/OpenAI dispatch
-│   ├── github_client.py            # diff fetch, batch comment posting, reactions
-│   ├── db.py                       # Postgres (Neon) read/write helpers
-│   ├── capture_reply_feedback.py   # entry point: reply feedback workflow
-│   └── poll_reactions.py           # entry point: reaction-polling workflow
-├── schema.sql                      # run once against your Neon database
-└── requirements.txt
+│   ├── __init__.py
+│   ├── main.py                            # pipeline orchestrator (entry point for /review)
+│   ├── filtering.py                       # file exclude/rank/cap logic
+│   ├── context.py                         # tree-sitter enclosing-function extraction
+│   ├── generate.py                        # legacy single-agent generator (superseded by agents/, kept for reference)
+│   ├── grade.py                           # independent confidence-grading pass
+│   ├── llm_client.py                      # shared Claude/OpenAI raw-SDK dispatch (used by grade.py)
+│   ├── github_client.py                   # diff fetch, batch comment posting, reactions
+│   ├── db.py                              # Postgres (Neon) read/write helpers
+│   ├── candidate.py                       # shared CandidateComment dataclass
+│   ├── context_formatting.py              # shared prompt-building helper (used by all agents)
+│   ├── capture_reply_feedback.py          # entry point: reply feedback workflow
+│   ├── poll_reactions.py                  # entry point: reaction-polling workflow
+│   │
+│   └── agents/                            # multi-agent generation (LangChain + LangGraph)
+│       ├── __init__.py                    # public API: run_agents(), describe_registry(), enable_agent()
+│       ├── config.py                      # AgentConfig dataclass
+│       ├── registry.py                    # CORRECTNESS_AGENT + SECURITY_AGENT defined here
+│       ├── prompts.py                     # shared system prompt scaffold
+│       ├── llm.py                         # LangChain chat model factory (Claude/OpenAI)
+│       ├── graph.py                       # LangGraph StateGraph — parallel fan-out/fan-in per agent
+│       └── tools.py                       # OSV.dev vulnerability lookup tool (security agent)
+│
+├── schema.sql                             # run once against Neon
+├── requirements.txt
+├── README.md
+└── architecture.md
 ```
 
 ## Setup
