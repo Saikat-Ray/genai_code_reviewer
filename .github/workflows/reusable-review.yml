@@ -124,6 +124,7 @@ jobs:
           BASE_SHA: ${{ steps.pr.outputs.base_sha }}
           TRIGGERED_BY: ${{ steps.perm-check.outputs.commenter }}
           COMMAND: ${{ inputs.trigger_comment }}
+          PYTHONPATH: ${{ github.workspace }}
         run: python -m review_bot.main
 
       - name: Post failure notice
