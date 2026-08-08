@@ -107,15 +107,23 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install dependencies
-        if: steps.perm-check.outputs.allowed == 'true'
-        run: pip install -r requirements.txt
-      
       - name: Checkout reusable repository
+        if: steps.perm-check.outputs.allowed == 'true'
         uses: actions/checkout@v4
         with:
-          repository: your-org/genai_code_reviewer
+          repository: Saikat-Ray/genai_code_reviewer
           path: reviewer_repo
+          # Only needed if genai_code_reviewer is PRIVATE — the default GITHUB_TOKEN
+          # is scoped to the calling repo and can't check out a different private
+          # repo. If genai_code_reviewer is public, this line (and the secret) can
+          # be removed entirely. If private, add a fine-grained PAT with read access
+          # to genai_code_reviewer as a secret (e.g. REVIEWER_REPO_TOKEN) in every
+          # CALLING repo, and pass it through here.
+          token: ${{ secrets.REVIEWER_REPO_TOKEN || github.token }}
+
+      - name: Install dependencies
+        if: steps.perm-check.outputs.allowed == 'true'
+        run: pip install -r reviewer_repo/requirements.txt
 
       - name: Run AI review pipeline
         if: steps.perm-check.outputs.allowed == 'true'
