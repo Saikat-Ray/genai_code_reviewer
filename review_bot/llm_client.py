@@ -36,4 +36,26 @@ def _call_openai(*, model: str, system: str, user_message: str, max_tokens: int)
             {"role": "user", "content": user_message},
         ],
     )
-    return response.choices[0].message.content
+
+    choice = response.choices[0]
+    content = choice.message.content
+
+    if not content:
+        # GPT-5 family and o-series models consume reasoning tokens against the
+        # SAME max_completion_tokens budget as the visible output. If the prompt
+        # is large (e.g. a full function's context + diff) or the model reasons
+        # a lot, it can burn the entire budget on internal reasoning and leave
+        # zero tokens for the actual answer — producing an empty string here.
+        # finish_reason='length' confirms truncation rather than some other cause.
+        usage = getattr(response, "usage", None)
+        reasoning_tokens = getattr(getattr(usage, "completion_tokens_details", None), "reasoning_tokens", None)
+        raise RuntimeError(
+            f"OpenAI returned empty content for model '{model}'. "
+            f"finish_reason={choice.finish_reason!r}, "
+            f"reasoning_tokens_used={reasoning_tokens}, max_completion_tokens={max_tokens}. "
+            f"Likely cause: the token budget was entirely consumed by internal reasoning "
+            f"before any visible output could be produced. Increase max_tokens (via "
+            f"GENERATOR_MAX_TOKENS / GRADER_MAX_TOKENS env vars) and retry."
+        )
+
+    return content

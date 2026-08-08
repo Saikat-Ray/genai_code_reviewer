@@ -95,11 +95,15 @@ def post_review(pr, *, commit_sha: str, accepted_comments: list[dict]) -> dict[i
         # decide how to handle: log and stop, or retry without the offending comment.
         raise RuntimeError(f"Failed to post review: {e.data}") from e
 
-    # Map posted comments back to internal ids by matching (path, line) — the
-    # review response includes the created review comments with their ids.
-    posted_by_location = {
-        (rc.path, rc.original_line): str(rc.id) for rc in review.get_comments()
-    }
+    # PullRequestReview (the object create_review returns) doesn't expose its
+    # own comments in PyGithub — there's no review.get_comments(). Instead,
+    # fetch all review comments on the PR and filter down to the ones that
+    # belong to the review we just created, matched via pull_request_review_id.
+    posted_by_location = {}
+    for rc in pr.get_review_comments():
+        if getattr(rc, "pull_request_review_id", None) != review.id:
+            continue
+        posted_by_location[(rc.path, rc.original_line)] = str(rc.id)
 
     result = {}
     for c in accepted_comments:
